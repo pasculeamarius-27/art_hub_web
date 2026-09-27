@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
+import { ONBOARDING_KEY, OnboardingChoice, readOnboarding } from '../lib/onboarding'
+import { Onboarding } from '../components/Onboarding'
 import { FEATURES, FeatureId } from '../lib/features'
 import { FeatureNavigation } from '../components/FeatureNavigation'
 import { FeaturePreview } from '../components/FeaturePreview'
@@ -15,6 +17,7 @@ const JOURNAL_KEY = 'kulth:demo-journal:v1'
 export default function Home() {
   const [area, setArea] = useState<Area>('companion')
   const [feature, setFeature] = useState<FeatureId>('feed')
+  const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const [phase, setPhase] = useState<JourneyPhase>('during')
   const [artworkIndex, setArtworkIndex] = useState(0)
   const [mode, setMode] = useState<CompanionMode>('look')
@@ -42,6 +45,7 @@ export default function Home() {
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('area') === 'studio') setArea('studio')
+    setOnboarded(Boolean(readOnboarding(localStorage.getItem(ONBOARDING_KEY))))
     setJournal(readJournal(localStorage.getItem(JOURNAL_KEY)))
     try {
       const savedArtist = localStorage.getItem('artist')
@@ -66,6 +70,12 @@ export default function Home() {
     during: { eyebrow: `During the visit · ${artwork.room}`, title: artwork.title, text: artwork.statement },
     after: { eyebrow: 'After the visit', title: 'Keep what stayed with you', text: 'Return to saved works, your own words and the artist-approved sources behind the experience.' },
   })[phase], [phase, artwork])
+
+  const completeOnboarding = (choice: OnboardingChoice) => {
+    try { localStorage.setItem(ONBOARDING_KEY, JSON.stringify({ choice, complete: true })) } catch { /* Demo stays usable if storage is unavailable. */ }
+    setOnboarded(true)
+    setFeature(choice === 'learn' ? 'chat' : 'feed')
+  }
 
   const persistJournal = (entry: JournalEntry) => {
     const updated = { ...journal, [artwork.id]: entry }
@@ -127,11 +137,11 @@ export default function Home() {
           <div className={styles.demoBadge}>Concept build · local data</div>
         </header>
 
-        {area === 'companion' && <FeatureNavigation selected={feature} onSelect={setFeature} />}
+        {area === 'companion' && onboarded && <FeatureNavigation selected={feature} onSelect={setFeature} />}
 
         {notice && <div className={styles.notice} role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notice">×</button></div>}
 
-        {area === 'companion' && feature !== 'feed' ? <FeaturePreview selected={feature} onFeed={() => setFeature('feed')} /> : area === 'companion' ? (
+        {area === 'companion' && onboarded === false ? <Onboarding onComplete={completeOnboarding} /> : area === 'companion' && onboarded === null ? <main aria-busy="true" /> : area === 'companion' && feature !== 'feed' ? <FeaturePreview selected={feature} onFeed={() => setFeature('feed')} /> : area === 'companion' ? (
           <main className={styles.companion}>
             <aside className={styles.rail}>
               <p className={styles.railLabel}>Your visit</p>
