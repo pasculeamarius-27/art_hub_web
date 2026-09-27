@@ -1,358 +1,171 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Head from 'next/head'
 import styles from '../styles/Home.module.css'
+import { DEMO_ARTWORKS, MODES, CompanionMode, JourneyPhase, JournalEntry, readJournal } from '../lib/domain'
 
-interface Artist {
-  name: string
-  bio: string
-}
+interface Artist { name: string; bio: string }
+interface Artwork { id: string; title: string; medium: string; price: number; imageBase64: string; aiDescription?: string; approvedSource?: string; createdAt: string }
 
-interface Artwork {
-  id: string
-  title: string
-  medium: string
-  price: number
-  imageBase64: string
-  aiDescription?: string
-  createdAt: string
-}
+type Area = 'companion' | 'studio'
+const JOURNAL_KEY = 'kulth:demo-journal:v1'
 
 export default function Home() {
-  const [tab, setTab] = useState<'gallery' | 'profile'>('profile')
+  const [area, setArea] = useState<Area>('companion')
+  const [phase, setPhase] = useState<JourneyPhase>('during')
+  const [artworkIndex, setArtworkIndex] = useState(0)
+  const [mode, setMode] = useState<CompanionMode>('look')
+  const [journal, setJournal] = useState<Record<string, JournalEntry>>({})
+  const [reflection, setReflection] = useState('')
+  const [showSources, setShowSources] = useState(false)
+
   const [artist, setArtist] = useState<Artist | null>(null)
   const [artworks, setArtworks] = useState<Artwork[]>([])
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null)
-  const [apiKey, setApiKey] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-
-  // Profile form
   const [profileName, setProfileName] = useState('')
   const [profileBio, setProfileBio] = useState('')
-
-  // Artwork form
   const [artworkTitle, setArtworkTitle] = useState('')
   const [artworkMedium, setArtworkMedium] = useState('')
   const [artworkPrice, setArtworkPrice] = useState('')
   const [artworkImage, setArtworkImage] = useState<string | null>(null)
+  const [artworkSource, setArtworkSource] = useState('')
   const [showArtworkForm, setShowArtworkForm] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [notice, setNotice] = useState('')
 
-  // Load data from localStorage on mount
+  const artwork = DEMO_ARTWORKS[artworkIndex]
+  const currentJournal = journal[artwork.id]
+  const savedCount = Object.values(journal).filter((entry) => entry.saved).length
+
   useEffect(() => {
-    const savedArtist = localStorage.getItem('artist')
-    const savedArtworks = localStorage.getItem('artworks')
-
-    if (savedArtist) {
-      const parsed = JSON.parse(savedArtist)
-      setArtist(parsed)
-      setProfileName(parsed.name)
-      setProfileBio(parsed.bio)
-    }
-
-    if (savedArtworks) {
-      setArtworks(JSON.parse(savedArtworks))
-    }
+    if (new URLSearchParams(window.location.search).get('area') === 'studio') setArea('studio')
+    setJournal(readJournal(localStorage.getItem(JOURNAL_KEY)))
+    try {
+      const savedArtist = localStorage.getItem('artist')
+      const savedArtworks = localStorage.getItem('artworks')
+      if (savedArtist) {
+        const parsed = JSON.parse(savedArtist)
+        if (parsed && typeof parsed.name === 'string' && typeof parsed.bio === 'string') {
+          setArtist(parsed); setProfileName(parsed.name); setProfileBio(parsed.bio)
+        }
+      }
+      if (savedArtworks) {
+        const parsed = JSON.parse(savedArtworks)
+        if (Array.isArray(parsed)) setArtworks(parsed)
+      }
+    } catch { setNotice('Some older local demo data could not be read. Your browser data was not changed.') }
   }, [])
 
-  // Save profile
+  useEffect(() => { setReflection(currentJournal?.reflection || '') }, [artwork.id, currentJournal?.reflection])
+
+  const phaseCopy = useMemo(() => ({
+    before: { eyebrow: 'Before the visit', title: 'Arrive with one good question', text: 'A two-minute orientation, shaped by the exhibition rather than a generic audio guide.' },
+    during: { eyebrow: `During the visit · ${artwork.room}`, title: artwork.title, text: artwork.statement },
+    after: { eyebrow: 'After the visit', title: 'Keep what stayed with you', text: 'Return to saved works, your own words and the artist-approved sources behind the experience.' },
+  })[phase], [phase, artwork])
+
+  const persistJournal = (entry: JournalEntry) => {
+    const updated = { ...journal, [artwork.id]: entry }
+    setJournal(updated)
+    localStorage.setItem(JOURNAL_KEY, JSON.stringify(updated))
+  }
+
+  const toggleSave = () => persistJournal({ artworkId: artwork.id, saved: !currentJournal?.saved, reflection, updatedAt: new Date().toISOString() })
+  const saveReflection = () => {
+    persistJournal({ artworkId: artwork.id, saved: currentJournal?.saved || false, reflection: reflection.trim().slice(0, 800), updatedAt: new Date().toISOString() })
+    setNotice('Reflection saved in this browser only.')
+  }
+
   const saveProfile = () => {
-    if (!profileName.trim() || !profileBio.trim()) {
-      alert('Please fill in all fields')
-      return
-    }
-
-    const newArtist = { name: profileName, bio: profileBio }
-    setArtist(newArtist)
-    localStorage.setItem('artist', JSON.stringify(newArtist))
-    alert('Profile saved!')
+    if (!profileName.trim() || !profileBio.trim()) return setNotice('Add both a name and an artist statement.')
+    const next = { name: profileName.trim(), bio: profileBio.trim() }
+    setArtist(next); localStorage.setItem('artist', JSON.stringify(next)); setNotice('Studio profile saved locally.')
   }
 
-  // Handle image upload
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setArtworkImage(event.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (file.size > 1_500_000) return setNotice('For this local demo, choose an image below 1.5 MB.')
+    const reader = new FileReader(); reader.onload = (e) => setArtworkImage(e.target?.result as string); reader.readAsDataURL(file)
   }
 
-  // Save artwork
   const saveArtwork = () => {
-    if (!artworkTitle.trim() || !artworkMedium.trim() || !artworkPrice.trim() || !artworkImage) {
-      alert('Please fill in all fields and select an image')
-      return
-    }
-
-    const newArtwork: Artwork = {
-      id: Date.now().toString(),
-      title: artworkTitle,
-      medium: artworkMedium,
-      price: parseFloat(artworkPrice),
-      imageBase64: artworkImage,
-      createdAt: new Date().toISOString(),
-    }
-
-    const updated = [...artworks, newArtwork]
-    setArtworks(updated)
-    localStorage.setItem('artworks', JSON.stringify(updated))
-
-    // Reset form
-    setArtworkTitle('')
-    setArtworkMedium('')
-    setArtworkPrice('')
-    setArtworkImage(null)
-    setShowArtworkForm(false)
-    alert('Artwork added!')
+    const price = Number(artworkPrice)
+    if (!artworkTitle.trim() || !artworkMedium.trim() || !artworkImage || !Number.isFinite(price) || price < 0) return setNotice('Add a title, medium, valid price and image.')
+    const next: Artwork = { id: crypto.randomUUID(), title: artworkTitle.trim(), medium: artworkMedium.trim(), price, imageBase64: artworkImage, approvedSource: artworkSource.trim(), createdAt: new Date().toISOString() }
+    const updated = [...artworks, next]
+    setArtworks(updated); localStorage.setItem('artworks', JSON.stringify(updated)); setShowArtworkForm(false)
+    setArtworkTitle(''); setArtworkMedium(''); setArtworkPrice(''); setArtworkImage(null); setArtworkSource(''); setNotice('Artwork saved locally. It is not published.')
   }
 
-  // Generate AI description
   const generateDescription = async () => {
     if (!selectedArtwork || !artist) return
-
-    if (!apiKey.trim()) {
-      alert('Please enter your Claude API key')
-      return
-    }
-
-    setIsGenerating(true)
+    if (!selectedArtwork.approvedSource?.trim()) return setNotice('Add an artist-approved source before generating mediation.')
+    setIsGenerating(true); setNotice('')
     try {
-      const response = await fetch('/api/generate-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey,
-          title: selectedArtwork.title,
-          medium: selectedArtwork.medium,
-          artistName: artist.name,
-          artistBio: artist.bio,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`)
-      }
-
+      const response = await fetch('/api/generate-description', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: selectedArtwork.title, medium: selectedArtwork.medium, artistName: artist.name, artistBio: artist.bio, approvedSource: selectedArtwork.approvedSource }) })
       const data = await response.json()
-      const description = data.description
-
-      // Update artwork with description
-      const updated = artworks.map((a) =>
-        a.id === selectedArtwork.id ? { ...a, aiDescription: description } : a
-      )
-      setArtworks(updated)
-      localStorage.setItem('artworks', JSON.stringify(updated))
-      setSelectedArtwork({ ...selectedArtwork, aiDescription: description })
-      alert('Description generated!')
-    } catch (error) {
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    } finally {
-      setIsGenerating(false)
-    }
+      if (!response.ok) throw new Error(data.error || 'Generation failed')
+      const updated = artworks.map((item) => item.id === selectedArtwork.id ? { ...item, aiDescription: data.description } : item)
+      setArtworks(updated); localStorage.setItem('artworks', JSON.stringify(updated)); setSelectedArtwork({ ...selectedArtwork, aiDescription: data.description }); setNotice('Draft mediation generated. Human approval is still required before publishing.')
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Generation failed') } finally { setIsGenerating(false) }
   }
 
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <h1>🎨 ArtHub</h1>
-        <p>AI-powered cultural mediation for independent artists</p>
-      </header>
+    <>
+      <Head><title>KULTH · Cultural mediation, made personal</title><meta name="description" content="A product concept for a personal companion in art." /><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+      <div className={styles.shell}>
+        <header className={styles.topbar}>
+          <button className={styles.wordmark} onClick={() => setArea('companion')} aria-label="Open KULTH companion">KULTH<span>.</span></button>
+          <nav aria-label="Product areas" className={styles.areaNav}>
+            <button className={area === 'companion' ? styles.activeArea : ''} onClick={() => setArea('companion')}>Companion</button>
+            <button className={area === 'studio' ? styles.activeArea : ''} onClick={() => setArea('studio')}>Gallery Studio</button>
+          </nav>
+          <div className={styles.demoBadge}>Concept build · local data</div>
+        </header>
 
-      <nav className={styles.nav}>
-        <button
-          className={`${styles.navBtn} ${tab === 'profile' ? styles.active : ''}`}
-          onClick={() => setTab('profile')}
-        >
-          Profile
-        </button>
-        <button
-          className={`${styles.navBtn} ${tab === 'gallery' ? styles.active : ''}`}
-          onClick={() => setTab('gallery')}
-        >
-          Gallery
-        </button>
-      </nav>
+        {notice && <div className={styles.notice} role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notice">×</button></div>}
 
-      <main className={styles.main}>
-        {/* PROFILE TAB */}
-        {tab === 'profile' && (
-          <div className={styles.section}>
-            <h2>Artist Profile</h2>
-            <div className={styles.form}>
-              <div className={styles.formGroup}>
-                <label>Artist Name</label>
-                <input
-                  type="text"
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="Your name"
-                />
+        {area === 'companion' ? (
+          <main className={styles.companion}>
+            <aside className={styles.rail}>
+              <p className={styles.railLabel}>Your visit</p>
+              {(['before', 'during', 'after'] as JourneyPhase[]).map((item, index) => <button key={item} onClick={() => setPhase(item)} className={phase === item ? styles.activePhase : ''}><span>0{index + 1}</span>{item[0].toUpperCase() + item.slice(1)}</button>)}
+              <div className={styles.visitMeta}><span>{savedCount}</span><p>works saved<br />in this browser</p></div>
+            </aside>
+
+            <section className={styles.stage}>
+              <div className={styles.stageIntro}><p className={styles.eyebrow}>{phaseCopy.eyebrow}</p><h1>{phaseCopy.title}</h1><p className={styles.lede}>{phaseCopy.text}</p></div>
+
+              {phase === 'before' && <div className={styles.beforeCard}><p className={styles.micro}>A gentle starting point</p><h2>What changes when an artwork refuses to stay still?</h2><p>This demo exhibition follows surfaces, vessels and the way context changes with your position.</p><button onClick={() => setPhase('during')} className={styles.primaryAction}>Begin in Room 2 <span>↗</span></button></div>}
+
+              {phase === 'during' && <>
+                <div className={styles.artworkVisual} style={{ '--accent': artwork.accent } as React.CSSProperties} aria-label={`Abstract representation for ${artwork.title}`}><span className={styles.orbitOne} /><span className={styles.orbitTwo} /><span className={styles.artifactCore} /><p>{artwork.artist}<br /><small>{artwork.year} · {artwork.medium}</small></p></div>
+                <div className={styles.modeGrid}>{MODES.map((item) => <button key={item.id} className={mode === item.id ? styles.activeMode : ''} onClick={() => setMode(item.id)}><span>{item.eyebrow}</span>{item.label}</button>)}</div>
+                <article className={styles.responseCard}><div><p className={styles.micro}>{MODES.find((item) => item.id === mode)?.eyebrow}</p><p className={styles.response}>{artwork.prompts[mode]}</p></div><div className={styles.responseActions}><button onClick={() => setShowSources(!showSources)}>{showSources ? 'Hide sources' : `View ${artwork.sources.length} sources`}</button><button onClick={toggleSave}>{currentJournal?.saved ? 'Saved ✓' : 'Save work'}</button></div>{showSources && <div className={styles.sources}>{artwork.sources.map((source) => <div key={source.id}><strong>{source.label}</strong><p>“{source.excerpt}”</p></div>)}</div>}</article>
+                <div className={styles.artworkSwitch}><button onClick={() => { setArtworkIndex((artworkIndex - 1 + DEMO_ARTWORKS.length) % DEMO_ARTWORKS.length); setShowSources(false) }}>← Previous</button><span>{artworkIndex + 1} / {DEMO_ARTWORKS.length}</span><button onClick={() => { setArtworkIndex((artworkIndex + 1) % DEMO_ARTWORKS.length); setShowSources(false) }}>Next →</button></div>
+              </>}
+
+              {phase === 'after' && <div className={styles.afterGrid}><div className={styles.journalCard}><p className={styles.micro}>Your private note</p><label htmlFor="reflection">What are you still thinking about?</label><textarea id="reflection" maxLength={800} value={reflection} onChange={(e) => setReflection(e.target.value)} placeholder="Write in your own words…" /><div><small>{reflection.length}/800</small><button className={styles.primaryAction} onClick={saveReflection}>Save reflection</button></div></div><div className={styles.savedCard}><p className={styles.micro}>Visit thread</p><h2>{savedCount ? `${savedCount} work${savedCount === 1 ? '' : 's'} saved` : 'No works saved yet'}</h2><p>Your journal stays on this device in the concept build. A production account and consent model are part of the technical roadmap.</p><button onClick={() => setPhase('during')}>Return to the exhibition</button></div></div>}
+            </section>
+          </main>
+        ) : (
+          <main className={styles.studio}>
+            <div className={styles.studioHeader}><div><p className={styles.eyebrow}>Gallery Studio · local prototype</p><h1>Build the source of truth before asking AI to speak.</h1></div><p>This workspace preserves the original MVP flow while making the cultural-approval boundary explicit. Nothing here is published or synced.</p></div>
+            <section className={styles.studioGrid}>
+              <div className={styles.panel}><p className={styles.panelNumber}>01</p><h2>Artist identity</h2><label>Artist name<input value={profileName} onChange={(e) => setProfileName(e.target.value)} /></label><label>Artist statement<textarea rows={6} value={profileBio} onChange={(e) => setProfileBio(e.target.value)} /></label><button className={styles.primaryAction} onClick={saveProfile}>Save locally</button>{artist && <p className={styles.successLine}>Current local profile: {artist.name}</p>}</div>
+              <div className={styles.panel}><div className={styles.panelHeading}><div><p className={styles.panelNumber}>02</p><h2>Artwork records</h2></div><button onClick={() => setShowArtworkForm(!showArtworkForm)}>{showArtworkForm ? 'Close' : '+ Add artwork'}</button></div>
+                {showArtworkForm && artist && <div className={styles.artworkForm}><label>Title<input value={artworkTitle} onChange={(e) => setArtworkTitle(e.target.value)} /></label><label>Medium<input value={artworkMedium} onChange={(e) => setArtworkMedium(e.target.value)} /></label><label>Price hypothesis (€)<input type="number" min="0" step="0.01" value={artworkPrice} onChange={(e) => setArtworkPrice(e.target.value)} /></label><label>Image (under 1.5 MB)<input type="file" accept="image/*" onChange={handleImageUpload} /></label><label>Artist-approved source excerpt<textarea rows={5} value={artworkSource} onChange={(e) => setArtworkSource(e.target.value)} placeholder="Paste the exact approved material the draft may use." /></label><button className={styles.primaryAction} onClick={saveArtwork}>Save unpublished record</button></div>}
+                {!artist && <p className={styles.emptyState}>Create the artist identity first.</p>}
+                {artist && !artworks.length && !showArtworkForm && <p className={styles.emptyState}>No local artwork records yet.</p>}
+                <div className={styles.recordList}>{artworks.map((item) => <button key={item.id} onClick={() => setSelectedArtwork(item)}><img src={item.imageBase64} alt="" /><span><strong>{item.title}</strong><small>{item.medium} · {item.approvedSource ? 'source attached' : 'source missing'}</small></span><span>Open →</span></button>)}</div>
               </div>
-
-              <div className={styles.formGroup}>
-                <label>Bio / Artist Statement</label>
-                <textarea
-                  value={profileBio}
-                  onChange={(e) => setProfileBio(e.target.value)}
-                  placeholder="Tell us about your art practice..."
-                  rows={5}
-                />
-              </div>
-
-              <button onClick={saveProfile} className={styles.primaryBtn}>
-                Save Profile
-              </button>
-            </div>
-
-            {artist && (
-              <div className={styles.card}>
-                <h3>Current Profile</h3>
-                <p><strong>Name:</strong> {artist.name}</p>
-                <p><strong>Bio:</strong> {artist.bio}</p>
-              </div>
-            )}
-          </div>
+            </section>
+          </main>
         )}
 
-        {/* GALLERY TAB */}
-        {tab === 'gallery' && (
-          <div className={styles.section}>
-            <div className={styles.galleryHeader}>
-              <h2>Artwork Gallery</h2>
-              <button onClick={() => setShowArtworkForm(!showArtworkForm)} className={styles.primaryBtn}>
-                + Add Artwork
-              </button>
-            </div>
-
-            {!artist && (
-              <div className={styles.warning}>
-                Please create an artist profile first
-              </div>
-            )}
-
-            {/* Artwork Form */}
-            {showArtworkForm && artist && (
-              <div className={styles.form}>
-                <div className={styles.formGroup}>
-                  <label>Artwork Title</label>
-                  <input
-                    type="text"
-                    value={artworkTitle}
-                    onChange={(e) => setArtworkTitle(e.target.value)}
-                    placeholder="Title"
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Medium</label>
-                  <input
-                    type="text"
-                    value={artworkMedium}
-                    onChange={(e) => setArtworkMedium(e.target.value)}
-                    placeholder="e.g., Oil on Canvas"
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Price ($)</label>
-                  <input
-                    type="number"
-                    value={artworkPrice}
-                    onChange={(e) => setArtworkPrice(e.target.value)}
-                    placeholder="0.00"
-                    step="0.01"
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Image</label>
-                  <input type="file" accept="image/*" onChange={handleImageUpload} />
-                  {artworkImage && (
-                    <div className={styles.imagePreview}>
-                      <img src={artworkImage} alt="Preview" />
-                    </div>
-                  )}
-                </div>
-
-                <div className={styles.formActions}>
-                  <button onClick={saveArtwork} className={styles.primaryBtn}>
-                    Save Artwork
-                  </button>
-                  <button onClick={() => setShowArtworkForm(false)} className={styles.secondaryBtn}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Artwork Grid */}
-            {artworks.length === 0 ? (
-              <p className={styles.empty}>No artworks yet. Add one to get started!</p>
-            ) : (
-              <div className={styles.grid}>
-                {artworks.map((artwork) => (
-                  <div
-                    key={artwork.id}
-                    className={styles.card}
-                    onClick={() => setSelectedArtwork(artwork)}
-                  >
-                    <img src={artwork.imageBase64} alt={artwork.title} />
-                    <h3>{artwork.title}</h3>
-                    <p className={styles.price}>${artwork.price.toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* Artwork Detail Modal */}
-      {selectedArtwork && (
-        <div className={styles.modal}>
-          <div className={styles.modalContent}>
-            <button className={styles.closeBtn} onClick={() => setSelectedArtwork(null)}>×</button>
-
-            <img src={selectedArtwork.imageBase64} alt={selectedArtwork.title} className={styles.modalImage} />
-
-            <div className={styles.modalDetails}>
-              <h2>{selectedArtwork.title}</h2>
-              <p className={styles.medium}>{selectedArtwork.medium}</p>
-              <p className={styles.modalPrice}>${selectedArtwork.price.toFixed(2)}</p>
-
-              <div className={styles.description}>
-                <h3>AI-Generated Description</h3>
-                {selectedArtwork.aiDescription ? (
-                  <p>{selectedArtwork.aiDescription}</p>
-                ) : (
-                  <p className={styles.noDescription}>No description yet. Generate one to create an engaging cultural narrative.</p>
-                )}
-              </div>
-
-              <div className={styles.apiSection}>
-                <input
-                  type="password"
-                  placeholder="Claude API Key"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className={styles.apiInput}
-                />
-                <button
-                  onClick={generateDescription}
-                  disabled={isGenerating}
-                  className={styles.primaryBtn}
-                >
-                  {isGenerating ? 'Generating...' : 'Generate AI Description'}
-                </button>
-              </div>
-
-              <p className={styles.hint}>
-                Get your API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        {selectedArtwork && <div className={styles.modal} role="dialog" aria-modal="true" aria-label={`${selectedArtwork.title} draft mediation`}><div className={styles.modalContent}><button className={styles.close} onClick={() => setSelectedArtwork(null)} aria-label="Close">×</button><img src={selectedArtwork.imageBase64} alt={selectedArtwork.title} /><p className={styles.eyebrow}>Unpublished studio record</p><h2>{selectedArtwork.title}</h2><p>{selectedArtwork.medium} · €{selectedArtwork.price.toFixed(2)}</p><div className={styles.sourceBox}><strong>Approved source supplied</strong><p>{selectedArtwork.approvedSource || 'No approved source yet.'}</p></div>{selectedArtwork.aiDescription && <div className={styles.draftBox}><strong>AI mediation draft</strong><p>{selectedArtwork.aiDescription}</p></div>}<button className={styles.primaryAction} disabled={isGenerating || !selectedArtwork.approvedSource} onClick={generateDescription}>{isGenerating ? 'Generating…' : 'Generate grounded draft'}</button><small className={styles.disclaimer}>Uses a server-configured model key. A generated draft still needs human approval.</small></div></div>}
+        <footer className={styles.footer}><span>KULTH</span><p>Cultural mediation, made personal.</p><p>Foundation branch · not production</p></footer>
+      </div>
+    </>
   )
 }
