@@ -112,13 +112,13 @@ export default function Home() {
 
   return (
     <>
-      <Head><title>KULTH · Cultural mediation, made personal</title><meta name="description" content="A product concept for a personal companion in art." /><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+      <Head><title>Antre · Every artwork has more to say</title><meta name="description" content="A product concept for a personal companion in art." /><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
       <div className={styles.shell}>
         <header className={styles.topbar}>
-          <button className={styles.wordmark} onClick={() => setArea('companion')} aria-label="Open KULTH companion">KULTH<span>.</span></button>
+          <button className={styles.wordmark} onClick={() => setArea('companion')} aria-label="Open Antre companion">Antre<span>.</span></button>
           <nav aria-label="Product areas" className={styles.areaNav}>
             <button className={area === 'companion' ? styles.activeArea : ''} onClick={() => setArea('companion')}>Companion</button>
-            <button className={area === 'studio' ? styles.activeArea : ''} onClick={() => setArea('studio')}>Gallery Studio</button>
+            <button className={area === 'studio' ? styles.activeArea : ''} onClick={() => setArea('studio')}>Art Voice</button>
           </nav>
           <div className={styles.demoBadge}>Concept build · local data</div>
         </header>
@@ -150,7 +150,7 @@ export default function Home() {
           </main>
         ) : (
           <main className={styles.studio}>
-            <div className={styles.studioHeader}><div><p className={styles.eyebrow}>Gallery Studio · local prototype</p><h1>Build the source of truth before asking AI to speak.</h1></div><p>This workspace preserves the original MVP flow while making the cultural-approval boundary explicit. Nothing here is published or synced.</p></div>
+            <div className={styles.studioHeader}><div><p className={styles.eyebrow}>Art Voice · local prototype</p><h1>Build the source of truth before asking AI to speak.</h1></div><p>This workspace preserves the original MVP flow while making the cultural-approval boundary explicit. Nothing here is published or synced.</p></div>
             <section className={styles.studioGrid}>
               <div className={styles.panel}><p className={styles.panelNumber}>01</p><h2>Artist identity</h2><label>Artist name<input value={profileName} onChange={(e) => setProfileName(e.target.value)} /></label><label>Artist statement<textarea rows={6} value={profileBio} onChange={(e) => setProfileBio(e.target.value)} /></label><button className={styles.primaryAction} onClick={saveProfile}>Save locally</button>{artist && <p className={styles.successLine}>Current local profile: {artist.name}</p>}</div>
               <div className={styles.panel}><div className={styles.panelHeading}><div><p className={styles.panelNumber}>02</p><h2>Artwork records</h2></div><button onClick={() => setShowArtworkForm(!showArtworkForm)}>{showArtworkForm ? 'Close' : '+ Add artwork'}</button></div>
@@ -164,7 +164,7 @@ export default function Home() {
         )}
 
         {selectedArtwork && <div className={styles.modal} role="dialog" aria-modal="true" aria-label={`${selectedArtwork.title} draft mediation`}><div className={styles.modalContent}><button className={styles.close} onClick={() => setSelectedArtwork(null)} aria-label="Close">×</button><img src={selectedArtwork.imageBase64} alt={selectedArtwork.title} /><p className={styles.eyebrow}>Unpublished studio record</p><h2>{selectedArtwork.title}</h2><p>{selectedArtwork.medium} · €{selectedArtwork.price.toFixed(2)}</p><div className={styles.sourceBox}><strong>Approved source supplied</strong><p>{selectedArtwork.approvedSource || 'No approved source yet.'}</p></div>{selectedArtwork.aiDescription && <div className={styles.draftBox}><strong>AI mediation draft</strong><p>{selectedArtwork.aiDescription}</p></div>}<button className={styles.primaryAction} disabled={isGenerating || !selectedArtwork.approvedSource} onClick={generateDescription}>{isGenerating ? 'Generating…' : 'Generate grounded draft'}</button><small className={styles.disclaimer}>Uses a server-configured model key. A generated draft still needs human approval.</small></div></div>}
-        <footer className={styles.footer}><span>KULTH</span><p>Cultural mediation, made personal.</p><p>Foundation branch · not production</p></footer>
+        <footer className={styles.footer}><span>Antre</span><p>Every artwork has more to say.</p><p>Foundation branch · not production</p></footer>
       </div>
     </>
   )

@@ -43,3 +43,13 @@
 .shell{color:var(--ink)}
 .notice button{color:var(--bg)}
 .modal{background:rgba(29,28,26,.42)}
+
+/* Antre C5 foundation: common restrained chrome, artwork space remains opaque. */
+.wordmark{letter-spacing:-.055em;font-family:Georgia,serif;font-weight:500;text-transform:none}
+.wordmark span{color:var(--coral)}
+.artworkVisual{background:var(--panel);border-color:var(--line)}
+.responseCard,.modalContent{background:var(--paper)}
+.topbar{background:rgba(247,244,239,.94)}
+@supports (backdrop-filter:blur(12px)){.topbar{backdrop-filter:blur(12px)}}
+@media (prefers-reduced-transparency:reduce){.topbar{background:var(--bg);backdrop-filter:none}}
+@media (prefers-reduced-motion:reduce){.grid .card:hover{transform:none}}
