@@ -1,8 +1,8 @@
-:root { color-scheme: dark; --navy:#08182f; --ink:#f3efe5; --coral:#ff765f; --muted:#a9b3c2; --line:rgba(243,239,229,.16); --panel:#102540; }
+:root { color-scheme: light; --bg:#faf7f1; --ink:#1d1c1a; --paper:#fffdf8; --coral:#d64545; --violet:#7c53e8; --muted:#7a736c; --line:rgba(29,28,26,.14); --panel:#ffffff; }
 * { box-sizing:border-box; margin:0; padding:0; }
-html { background:var(--navy); scroll-behavior:smooth; }
-body { min-width:320px; background:var(--navy); color:var(--ink); font-family:Arial, Helvetica, sans-serif; }
+html { background:var(--bg); scroll-behavior:smooth; }
+body { min-width:320px; background:var(--bg); color:var(--ink); font-family:Arial, Helvetica, sans-serif; }
 button,input,textarea { font:inherit; }
 button { cursor:pointer; }
-button:focus-visible,input:focus-visible,textarea:focus-visible { outline:2px solid var(--coral); outline-offset:3px; }
+button:focus-visible,input:focus-visible,textarea:focus-visible { outline:2px solid var(--violet); outline-offset:3px; }
 a { color:inherit; }
