@@ -1,0 +1,7 @@
+# Art Feed guest window - local demo only
+
+The pure `feedWindow` function admits unique approved records, paginates without skipping, caps guest discovery at a configurable starting value of 10 and signals an account gate only when more approved items remain. Its tests cover unpublished/duplicate exclusion, invalid cursors and the previous-work context invariant. The UI renders twelve explicit abstract placeholder studies; ten are browsable, two remain behind a disabled signup call-to-action. No real artist/source is implied.
+
+Important security boundary: the current app is a browser-only Next.js concept. `feedWindow` executes client-side for demo and cannot be an authorization mechanism. An attacker can inspect bundled studies or change client state. Before actual content is used, enforce public approval, tenant isolation, pagination limit and session/account rules on a Firebase-backed server plus Security Rules, test guest/account cases in Emulator Suite, and choose privacy-respecting anti-abuse with Constantin. No real Firebase project or user data is configured here. The signup button is disabled because no authentication flow exists; a working conversion gate must not be faked.
+
+The other six features remain labelled concept-only. `Art Voice` is still a local prototype and must not be mistaken for artist approval. No PR merge/deploy until Constantin reviews the architecture and implementation.
