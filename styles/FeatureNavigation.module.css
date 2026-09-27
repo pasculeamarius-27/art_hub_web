@@ -1,0 +1,6 @@
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;padding:12px clamp(20px,4vw,64px);background:var(--bg);border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.nav button{flex:0 0 auto;min-height:52px;background:transparent;border:1px solid transparent;border-radius:12px;padding:8px 14px;text-align:left;color:var(--ink);font-size:12px;font-weight:650}
+.nav button span{display:block;color:var(--muted);font-size:10px;font-weight:400;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.nav button:hover,.nav button:focus-visible{border-color:var(--line)}
+.nav .active{background:var(--panel);border-color:var(--line)}
+@media(max-width:600px){.nav{padding:8px 16px}.nav button{min-height:48px;padding:7px 11px}}
