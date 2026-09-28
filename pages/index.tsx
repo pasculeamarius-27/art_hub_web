@@ -3,6 +3,7 @@ import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 import { ONBOARDING_KEY, OnboardingChoice, readOnboarding } from '../lib/onboarding'
 import { Onboarding } from '../components/Onboarding'
+import { ArtFeed } from '../components/ArtFeed'
 import { FEATURES, FeatureId } from '../lib/features'
 import { FeatureNavigation } from '../components/FeatureNavigation'
 import { FeaturePreview } from '../components/FeaturePreview'
@@ -141,7 +142,7 @@ export default function Home() {
 
         {notice && <div className={styles.notice} role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notice">×</button></div>}
 
-        {area === 'companion' && onboarded === false ? <Onboarding onComplete={completeOnboarding} /> : area === 'companion' && onboarded === null ? <main aria-busy="true" /> : area === 'companion' && feature !== 'feed' ? <FeaturePreview selected={feature} onFeed={() => setFeature('feed')} /> : area === 'companion' ? (
+        {area === 'companion' && onboarded === false ? <Onboarding onComplete={completeOnboarding} /> : area === 'companion' && onboarded === null ? <main aria-busy="true" /> : area === 'companion' && feature === 'feed' ? <ArtFeed /> : area === 'companion' && feature !== 'feed' ? <FeaturePreview selected={feature} onFeed={() => setFeature('feed')} /> : area === 'companion' ? (
           <main className={styles.companion}>
             <aside className={styles.rail}>
               <p className={styles.railLabel}>Your visit</p>
