@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
+import { FEATURES, FeatureId } from '../lib/features'
+import { FeatureNavigation } from '../components/FeatureNavigation'
+import { FeaturePreview } from '../components/FeaturePreview'
 import { DEMO_ARTWORKS, MODES, CompanionMode, JourneyPhase, JournalEntry, readJournal } from '../lib/domain'
 
 interface Artist { name: string; bio: string }
@@ -11,6 +14,7 @@ const JOURNAL_KEY = 'kulth:demo-journal:v1'
 
 export default function Home() {
   const [area, setArea] = useState<Area>('companion')
+  const [feature, setFeature] = useState<FeatureId>('feed')
   const [phase, setPhase] = useState<JourneyPhase>('during')
   const [artworkIndex, setArtworkIndex] = useState(0)
   const [mode, setMode] = useState<CompanionMode>('look')
@@ -115,17 +119,19 @@ export default function Home() {
       <Head><title>Antre · Every artwork has more to say</title><meta name="description" content="A product concept for a personal companion in art." /><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
       <div className={styles.shell}>
         <header className={styles.topbar}>
-          <button className={styles.wordmark} onClick={() => setArea('companion')} aria-label="Open Antre companion">Antre<span>.</span></button>
+          <button className={styles.wordmark} onClick={() => { setArea('companion'); setFeature('feed') }} aria-label="Open Antre companion">Antre<span>.</span></button>
           <nav aria-label="Product areas" className={styles.areaNav}>
-            <button className={area === 'companion' ? styles.activeArea : ''} onClick={() => setArea('companion')}>Companion</button>
+            <button className={area === 'companion' ? styles.activeArea : ''} onClick={() => { setArea('companion'); setFeature('feed') }}>Explore</button>
             <button className={area === 'studio' ? styles.activeArea : ''} onClick={() => setArea('studio')}>Art Voice</button>
           </nav>
           <div className={styles.demoBadge}>Concept build · local data</div>
         </header>
 
+        {area === 'companion' && <FeatureNavigation selected={feature} onSelect={setFeature} />}
+
         {notice && <div className={styles.notice} role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notice">×</button></div>}
 
-        {area === 'companion' ? (
+        {area === 'companion' && feature !== 'feed' ? <FeaturePreview selected={feature} onFeed={() => setFeature('feed')} /> : area === 'companion' ? (
           <main className={styles.companion}>
             <aside className={styles.rail}>
               <p className={styles.railLabel}>Your visit</p>
