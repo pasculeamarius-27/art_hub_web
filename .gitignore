@@ -13,3 +13,10 @@ yarn-debug.log
 yarn-error.log
 .DS_Store
 *.pem
+
+# Supabase local state and secrets
+supabase/.branches/
+supabase/.temp/
+supabase/.profiles/
+*.env
+!*.env.example
